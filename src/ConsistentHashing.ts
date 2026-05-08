@@ -82,7 +82,9 @@ export default class ConsistentHashing {
       // either there are no servers or
       // there is no server-hash greater than key-hash
       // -> search again from beginning of hash space
-      virtualServer = this.#serversSortedByHash.findNearestGreaterThan(0);
+      // find smallest hash
+      const nodes = this.#serversSortedByHash.toOrderedArray();
+      virtualServer = nodes.length > 0 ? { key: nodes[0].key, value: nodes[0].value } : undefined;
     }
     return virtualServer?.value;
   }
@@ -126,15 +128,15 @@ export default class ConsistentHashing {
     return sizes;
   }
 
-  // vehicel to trigger react re-renders (used as state)
+  // vehicle to trigger react re-renders (used as state)
   inspect() {
     const serverNodes = this.#serversSortedByHash.toOrderedArray();
 
     // TODO - holding the keys here is questionable
     const keys = [...this.#keys.values()];
 
-    const serverKeyMap = serverNodes.reduce((map, s) => {
-      map[s.value] = [];
+    const serverKeyMap = [...this.#servers.values()].reduce((map, s) => {
+      map[s] = [];
       return map;
     }, {} as ServerKeyMap);
 
@@ -155,8 +157,11 @@ export default class ConsistentHashing {
       servers: [...this.#servers.values()],
       sortedServerHashes: serverNodes.map((n) => n.key),
       serverHashMap: serverNodes.reduce((result, n) => {
-        const current = result[n.value] || [];
-        result[n.value] = [...current, n.key];
+        const physicalServer = this.#virtualServerMap.get(n.value);
+        if (physicalServer) {
+          const current = result[physicalServer] || [];
+          result[physicalServer] = [...current, n.key];
+        }
         return result;
       }, {} as ServerHashMap),
       keys,
@@ -209,11 +214,7 @@ function getHashRange(serverHash: number, sortedServerHashes: number[]): HashRan
   }
 
   const start = sortedServerHashes[startIdx];
-  const end = serverHash > 0 ? serverHash - 1 : MAX_HASH; // a key hash is mapped to it's nearest server node with a greater hash value
-
-  if (start === end) {
-    return undefined;
-  }
+  const end = serverHash;
 
   return { type: "partial", start, end };
 }

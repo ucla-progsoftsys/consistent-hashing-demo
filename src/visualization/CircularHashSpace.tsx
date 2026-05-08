@@ -4,6 +4,7 @@ import {
   hash,
   HashRange,
   getHashRange,
+  getSuccessorWrapping,
 } from "../ConsistentHashing";
 import Arc from "./Arc";
 import HighlightHashRange from "./HighlightHashRange";
@@ -60,37 +61,29 @@ export default function CircularHashSpace2(props: {
   );
 
   let hashRanges: HashRange[] = [];
+  let movedRanges: HashRange[] = [];
 
-  if (highlightServer) {
-    const sortedHashes = state.sortedServerHashes;
-    state.virtualServerHashes(highlightServer).forEach((d) => {
-      hashRanges.push(getHashRange(d, sortedHashes));
+  if (highlightServer && state.serverHashMap[highlightServer] !== undefined) {
+    // server nodes exists, show corresponding hash ranges
+    hashRanges = [...highlightServerHashes.values()].map((h) =>
+      getHashRange(h, state.sortedServerHashes)
+    );
+  } else if (highlightServer !== undefined) {
+    // server was deleted, show ranges formerly belonging to deleted server
+    // along with the ranges they were moved to
+    const deletedServerHashes = state.virtualServerHashes(highlightServer);
+    const sortedServerHashes = [...state.sortedServerHashes, ...deletedServerHashes].sort(
+      (a, b) => a - b
+    );
+
+    deletedServerHashes.forEach((d) => {
+      movedRanges.push(getHashRange(d, sortedServerHashes));
+      const successor = getSuccessorWrapping(d, sortedServerHashes);
+      if (successor !== undefined) {
+        hashRanges.push(getHashRange(successor, sortedServerHashes));
+      }
     });
   }
-
-  // let movedRanges: HashRange[] = [];
-
-  // if (highlightServer && state.serverHashMap[highlightServer] !== undefined) {
-  //   // server nodes exists, show corresponding hash ranges
-  //   hashRanges = [...highlightServerHashes.values()].map((h) =>
-  //     getHashRange(h, state.sortedServerHashes)
-  //   );
-  // } else if (highlightServer !== undefined) {
-  //   // server was deleted, show ranges formerly belonging to deleted server
-  //   // along with the ranges they were moved to
-  //   const deletedServerHashes = state.virtualServerHashes(highlightServer);
-  //   const sortedServerHashes = [...state.sortedServerHashes, ...deletedServerHashes].sort(
-  //     (a, b) => a - b
-  //   );
-
-  //   deletedServerHashes.forEach((d) => {
-  //     movedRanges.push(getHashRange(d, sortedServerHashes));
-  //     const successor = getSuccessorWrapping(d, sortedServerHashes);
-  //     if (successor !== undefined) {
-  //       hashRanges.push(getHashRange(successor, sortedServerHashes));
-  //     }
-  //   });
-  // }
 
   return (
     <svg
@@ -123,7 +116,7 @@ export default function CircularHashSpace2(props: {
           />
         ))}
 
-      {/* {movedRanges
+      {movedRanges
         .filter((r) => !!r)
         .map((r) => (
           <HighlightHashRange
@@ -132,7 +125,7 @@ export default function CircularHashSpace2(props: {
             range={r}
             color="lightsalmon"
           />
-        ))} */}
+        ))}
 
       {showArrow && highlightKeyHash && targetServerHash && (
         <Arrow
@@ -144,10 +137,10 @@ export default function CircularHashSpace2(props: {
         />
       )}
 
-      {/* {(state.keyHashes.length <= MAX_KEY_HASHES_BEFORE_SIMPLIFICATION &&
+      {(state.keyHashes.length <= MAX_KEY_HASHES_BEFORE_SIMPLIFICATION &&
         state.keyHashes.map((h) => (
           <KeyNode key={h} {...getCirclePoint(circle, h)} />
-        ))) || <KeyRing circle={circle} />} */}
+        ))) || <KeyRing circle={circle} />}
 
       {state.sortedServerHashes.map((h) => (
         <ServerNodeTick
