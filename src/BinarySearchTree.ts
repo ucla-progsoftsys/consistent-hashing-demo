@@ -131,9 +131,9 @@ export default class BinarySearchTree<T> {
 
       if (successorParent === current) {
         // current's right node has no left child
-        successorParent.right = undefined;
+        successorParent.right = successor.right;
       } else {
-        successorParent.left = undefined;
+        successorParent.left = successor.right;
       }
     }
   }

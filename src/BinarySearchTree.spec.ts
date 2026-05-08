@@ -255,6 +255,26 @@ describe("remove", () => {
       "        18  22",
     ]);
   });
+
+  test("node with both childs, and successor has right child", () => {
+    const bst = createFromPrint([
+      // prettier-ignore
+      "   6",
+      " 4     15",
+      "3 5  10    20",
+      "       12",
+    ]);
+    // 6 is root. 6's right is 15. 15's left is 10. 10's right is 12.
+    // successor of 6 is 10 (smallest in right subtree).
+    // 10 has a right child 12.
+    bst.remove(6);
+    expect(bst.print()).toStrictEqual([
+      // prettier-ignore
+      "   10",
+      " 4     15",
+      "3 5  12  20",
+    ]);
+  });
 });
 
 describe("toOrderedArray", () => {

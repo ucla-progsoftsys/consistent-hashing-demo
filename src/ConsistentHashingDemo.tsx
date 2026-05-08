@@ -11,8 +11,6 @@ import OverallStats from "./OverallStats";
 import { DivSpacer, SpanSpacer, Item } from "./Shared";
 import Legend from "./visualization/Legend";
 
-const VIRTUAL_NODES_COUNT = 1;
-
 export type Action = {
   action: "addServer" | "removeServer";
   server: string;
@@ -20,8 +18,9 @@ export type Action = {
 };
 
 export default function ConsistentHashingDemo() {
-  const csRef = React.useRef(new ConsistentHashing(VIRTUAL_NODES_COUNT));
-  const cs = csRef.current;
+  const [virtualNodesCount, setVirtualNodesCount] = React.useState(1);
+  const csRef = React.useRef(new ConsistentHashing(virtualNodesCount));
+  const nodeCountRef = React.useRef(0);
 
   const [csState, setCsState] = React.useState(emptyConsistentHashingState);
   const [lastAction, setLastAction] = React.useState<Action | undefined>();
@@ -31,7 +30,19 @@ export default function ConsistentHashingDemo() {
   const highlightServerExists =
     highlightServer && !!csState.serverKeyMap[highlightServer];
 
+  const getNextServerName = () => "node-" + nodeCountRef.current++;
+
+  // Sync virtual nodes count changes
+  React.useEffect(() => {
+    const newCs = new ConsistentHashing(virtualNodesCount);
+    csState.servers.forEach((s) => newCs.addServer(s));
+    csState.keys.forEach((k) => newCs.addKey(k));
+    csRef.current = newCs;
+    setCsState(newCs.inspect());
+  }, [virtualNodesCount]);
+
   const onAddServer = (count: number) => () => {
+    const cs = csRef.current;
     let server: string | undefined;
     for (let i = 0; i < count; i++) {
       server = getNextServerName();
@@ -45,7 +56,8 @@ export default function ConsistentHashingDemo() {
   };
 
   function onRemoveServer(e: React.MouseEvent) {
-    const server = (e.target as any).id;
+    const cs = csRef.current;
+    const server = (e.target as HTMLElement).closest("[id]")?.id;
     if (!!server && server !== "") {
       cs.removeServer(server);
       setCsState(cs.inspect());
@@ -55,13 +67,14 @@ export default function ConsistentHashingDemo() {
   }
 
   function onHoverServer(e: React.MouseEvent) {
-    const server = (e.target as any).id;
+    const server = (e.target as HTMLElement).closest("[id]")?.id;
     if (!!server && server !== "") {
       setHighlightServer(server);
     }
   }
 
   const onAddKey = (count: number) => () => {
+    const cs = csRef.current;
     for (let i = 0; i < count; i++) {
       const key = getNextKeyName();
       cs.addKey(key);
@@ -71,7 +84,8 @@ export default function ConsistentHashingDemo() {
   };
 
   function onRemoveKey(e: React.MouseEvent) {
-    const key = (e.target as any).id;
+    const cs = csRef.current;
+    const key = (e.target as HTMLElement).closest("[id]")?.id;
     if (!!key && key !== "") {
       cs.removeKey(key);
       setCsState(cs.inspect());
@@ -82,7 +96,8 @@ export default function ConsistentHashingDemo() {
   }
 
   function onHoverKey(e: React.MouseEvent) {
-    const key = (e.target as any).id;
+    const cs = csRef.current;
+    const key = (e.target as HTMLElement).closest("[id]")?.id;
     if (!!key && key !== "") {
       setHighlightKey(key);
       setHighlightServer(cs.lookupServer(key));
@@ -95,7 +110,8 @@ export default function ConsistentHashingDemo() {
   }
 
   function onReset() {
-    csRef.current = new ConsistentHashing(VIRTUAL_NODES_COUNT);
+    csRef.current = new ConsistentHashing(virtualNodesCount);
+    nodeCountRef.current = 0;
     setCsState(csRef.current.inspect());
     setHighlightKey(undefined);
     setHighlightServer(undefined);
@@ -106,47 +122,67 @@ export default function ConsistentHashingDemo() {
     <>
       <div
         style={{
-          height: 400,
           display: "flex",
           flexDirection: "row",
           justifyContent: "flex-start",
+          alignItems: "flex-start",
         }}
       >
-        <div style={{ position: "relative" }}>
-          <div style={{ position: "absolute", zIndex: -1 }}>
-            <CircularHashSpace
-              state={csState}
-              highlightKey={highlightKey}
-              highlightServer={highlightServer}
-            />
-          </div>
-          <div
-            style={{
-              width: 400,
-              height: 400,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-around",
-              alignItems: "center",
-            }}
-          >
-            <div style={{ height: "50%" }}>
-              {highlightServerExists ? (
-                <ServerStats server={highlightServer!} state={csState} />
-              ) : (
-                <OverallStats serverKeyCounts={csState.sortedServerKeyCounts} />
-              )}
-            </div>
-            {lastAction && (
-              <div onMouseOver={onHoverServer} onMouseLeave={onUnhover}>
-                <LastActionStats action={lastAction} />
-              </div>
+        <div
+          style={{
+            width: 250,
+            display: "flex",
+            flexDirection: "column",
+            padding: "1rem",
+            borderRight: "1px solid #eee",
+          }}
+        >
+          <div style={{ minHeight: "150px" }}>
+            {highlightServerExists ? (
+              <ServerStats server={highlightServer!} state={csState} />
+            ) : (
+              <OverallStats serverKeyCounts={csState.sortedServerKeyCounts} />
             )}
           </div>
+          <DivSpacer />
+          {lastAction && (
+            <div
+              onMouseOver={onHoverServer}
+              onMouseLeave={onUnhover}
+              id={lastAction.server}
+              style={{
+                padding: "1rem",
+                backgroundColor: "rgba(0,0,0,0.03)",
+                borderRadius: "8px",
+              }}
+            >
+              <LastActionStats action={lastAction} />
+            </div>
+          )}
+        </div>
+        <DivSpacer />
+        <div style={{ width: 400, height: 430 }}>
+          <CircularHashSpace
+            state={csState}
+            highlightKey={highlightKey}
+            highlightServer={highlightServer}
+          />
         </div>
         <DivSpacer />
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           <div>
+            <div style={{ marginBottom: "1rem" }}>
+              <label htmlFor="virtualNodes">Virtual Nodes: </label>
+              <input
+                id="virtualNodes"
+                type="number"
+                min="1"
+                max="100"
+                value={virtualNodesCount}
+                onChange={(e) => setVirtualNodesCount(parseInt(e.target.value) || 1)}
+                style={{ width: "3rem" }}
+              />
+            </div>
             <button onClick={onAddServer(1)}>add server</button>
             <SpanSpacer />
             <button onClick={onAddServer(10)}>add 10 servers</button>
@@ -169,6 +205,7 @@ export default function ConsistentHashingDemo() {
               flexDirection: "row",
               flexWrap: "wrap",
               overflowY: "auto",
+              maxHeight: "300px",
             }}
             onClick={onRemoveServer}
             onMouseOver={onHoverServer}
@@ -205,6 +242,7 @@ export default function ConsistentHashingDemo() {
               flexDirection: "row",
               flexWrap: "wrap",
               overflowY: "auto",
+              maxHeight: "300px",
             }}
             onClick={onRemoveKey}
             onMouseOver={onHoverKey}
@@ -217,8 +255,7 @@ export default function ConsistentHashingDemo() {
       <Legend />
     </>
   );
-}
-
+  }
 const MemoizedNodeList = React.memo(
   function NodeList(props: { names: string[] }) {
     return (
@@ -231,12 +268,6 @@ const MemoizedNodeList = React.memo(
   },
   (prev, next) => prev.names === next.names
 );
-
-let nodeCount = 0;
-
-function getNextServerName() {
-  return "node-" + nodeCount++;
-}
 
 function getNextKeyName() {
   return "k-" + uuid().slice(-6);

@@ -3,12 +3,13 @@ import * as React from "react";
 export function Item(props: { name: string }) {
   return (
     <div
+      id={props.name}
       style={{
         fontFamily: "monospace",
         padding: "0.25rem",
       }}
     >
-      <a id={props.name} href="#">
+      <a href="#" style={{ pointerEvents: "none" }}>
         {props.name}
       </a>
     </div>
